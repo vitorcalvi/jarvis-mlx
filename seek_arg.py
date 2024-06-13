@@ -2,6 +2,7 @@ import warnings
 import time
 import os
 import threading
+import argparse
 from queue import Queue
 import numpy as np
 import librosa
@@ -18,8 +19,16 @@ warnings.filterwarnings("ignore", category=UserWarning, message="torch.nn.utils.
 warnings.filterwarnings("ignore", message="Special tokens have been added in the vocabulary")
 warnings.filterwarnings("ignore", message="Some weights of the model checkpoint")
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Voice Assistant")
+    parser.add_argument('--agent', type=str, default='python teacher', help='The agent type')
+    args = parser.parse_args()
+    return args
+
+args = parse_args()
+AGENT = args.agent if args.agent else 'python teacher'
+
 # Prompts for the assistant
-AGENT = 'Python teacher'
 MASTER_PROMPT = f"You are a helpful and friendly {AGENT}. Respond to the user's input in no more than one great sentence, ensuring complete ideas. Provide only the dialogue in your response."
 SUB_MASTER_PROMPT = f"Hello! I'm your {AGENT}"
 
@@ -34,7 +43,7 @@ class Client:
         self.vad = VADDetector(lambda: None, self.on_speech_end, sensitivity=0.5)
         self.vad_data = Queue()
         self.tts = TTS(language="EN_NEWEST", device="mps")
-        self.stt = FastTranscriber("mlx-community/whisper-large-v3-mlx-8bit")
+        self.stt = FastTranscriber("mlx-community/whisper-large-v3-mlx-4bit")
         self.model, self.tokenizer = load("mlx-community/Phi-3-mini-4k-instruct-8bit")
         self.greet()
 
@@ -78,7 +87,7 @@ class Client:
         while True:
             if not self.vad_data.empty():
                 data = self.vad_data.get()
-                if self.listening and len(data) > 12000:
+                if self.listening and len(data) > 12000:  # Ensure the data length is sufficient
                     self.toggle_listening()
                     try:
                         transcribed = self.stt.transcribe(data, language="en")
